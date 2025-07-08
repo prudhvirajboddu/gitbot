@@ -1,0 +1,8 @@
+pytest             # test runner
+pytest-asyncio     # for async endpoint tests
+httpx              # HTTP client for testing
+pytest-cov         # coverage reporting
+fastapi[test]      # includes TestClient
+python-dotenv      # load .env in tests if needed
+sqlalchemy         # if you’re testing DB models
+alembic   
