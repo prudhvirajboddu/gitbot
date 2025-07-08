@@ -1,0 +1,5 @@
+gitpython          # clone & diff your GitHub repo
+langchain          # orchestration layer for LLM calls
+openai             # to hit the OpenAI API
+fastapi            # lightweight HTTP framework for our /api/gitbot endpoint
+python-dotenv      # load a local .env during development
