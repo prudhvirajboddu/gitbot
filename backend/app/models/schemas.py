@@ -1,5 +1,6 @@
+from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
-from typing import List, Optional
+
 
 
 class AuthRequestSchema(BaseModel):
@@ -23,6 +24,7 @@ class ChatResponseSchema(BaseModel):
     reply: str = Field(..., description="Assistant's reply message")
 
 class StatusResponseSchema(BaseModel):
-    job_id: str = Field(..., description="Identifier of the analysis job")
-    status: str = Field(..., description="Current status of the job")
-    progress: float = Field(..., description="Progress percentage of the job (0.0-1.0)")
+    job_id:   str               = Field(...)
+    status:   str               = Field(...)
+    progress: float             = Field(...)
+    result:   Optional[Dict[str, Any]] = Field(None)

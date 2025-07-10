@@ -1,3 +1,4 @@
+import os
 from fastapi import APIRouter, BackgroundTasks, HTTPException, status
 from pydantic import BaseModel
 
@@ -5,6 +6,7 @@ from ..config import settings
 from ..services.github_client import GitHubClient
 from ..services.summarization_engine import SummarizationEngine
 from ..services.diff_analyzer import DiffAnalyzer
+from ..services.job_store import init_job, update_job
 from ..utils.logger import get_logger
 
 router = APIRouter()
@@ -21,61 +23,44 @@ class AnalyzeResponse(BaseModel):
     response_model=AnalyzeResponse,
     status_code=status.HTTP_202_ACCEPTED,
 )
-async def analyze_repo(
-    request: AnalyzeRequest,
-    background_tasks: BackgroundTasks
-):
-    """
-    Trigger repository analysis asynchronously.
-    Returns a job_id to poll for status.
-    """
+async def analyze_repo(request: AnalyzeRequest, background_tasks: BackgroundTasks):
     client = GitHubClient()
     try:
-        # create_job clones into settings.REPO_BASE_PATH/{job_id} and returns both
         job_id, repo_path = client.clone_repo(request.repo_url)
     except Exception as e:
-        logger.error(f"Failed to enqueue analysis for {request.repo_url}: {e}")
+        logger.error(f"Failed to start analysis for {request.repo_url}: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Could not start analysis: " + str(e)
         )
 
-    # schedule the heavy work off to a background task
+    # Initialize job in our store
+    init_job(job_id)
+    # Kick off the background work
     background_tasks.add_task(run_analysis, job_id, repo_path)
     return AnalyzeResponse(job_id=job_id)
 
 async def run_analysis(job_id: str, repo_path: str):
-    """
-    Background task to perform:
-      1) Summarize code
-      2) Analyze diffs
-      3) Persist results
-      4) Cleanup cloned repo
-    """
+    """Background task: summarize, diff, persist, cleanup."""
     try:
+        # 1) Summarize
         engine = SummarizationEngine()
-        differ = DiffAnalyzer()
-
-        # Summarize all code files in the repo
         summaries = engine.summarize_repo(repo_path)
+        update_job(job_id, status="summarized", progress=0.5)
 
-        # Compute diffs (e.g. between last two commits)
+        # 2) Diff
+        differ = DiffAnalyzer()
         diffs = differ.compute_diffs(repo_path)
+        update_job(job_id, status="diffed", progress=0.8)
 
-        # TODO: Persist the summaries and diffs under job_id
-        # e.g. save_analysis_result(job_id, summaries, diffs)
-
-        print(summaries)
-
-        logger.info(f"Analysis for job {job_id} completed successfully.")
+        # 3) Persist final result
+        result = {"summaries": summaries, "diffs": diffs}
+        update_job(job_id, status="done", progress=1.0, result=result)
+        logger.info(f"Job {job_id} done")
 
     except Exception as exc:
-        logger.error(f"Analysis for job {job_id} failed: {exc}", exc_info=True)
-        # Clean up on failure
-        GitHubClient().cleanup(repo_path)
-        # TODO: mark job as failed in your job store
-        return
-
-    # Clean up the cloned repo to free disk space
-    GitHubClient().cleanup(repo_path)
-    # TODO: mark job as done in your job store
+        logger.error(f"Job {job_id} failed: {exc}", exc_info=True)
+        update_job(job_id, status="failed", progress=1.0)
+    finally:
+        # 4) Cleanup disk
+        GitHubClient().cleanup(job_id)
