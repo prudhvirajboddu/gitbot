@@ -1,12 +1,12 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
+import os
 from .api import auth, analyze, chat, status
 from .config import settings
-from .utils.logger import configure_logging
+from .utils.logger import get_logger
 
 # Initialize logging
-configure_logging()
+logger = get_logger(__name__)
 
 app = FastAPI(
     title=settings.PROJECT_NAME,

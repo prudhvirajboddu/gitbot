@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field
 from typing import List, Optional
 
+
 class AuthRequestSchema(BaseModel):
     openai_key: str = Field(..., description="User's OpenAI API key")
     github_token: str = Field(..., description="User's GitHub token")
