@@ -17,9 +17,8 @@ class SummarizationEngine:
                     continue
                 fpath = Path(root) / fname
                 content = fpath.read_text(errors='ignore')[:1500]
-                prompt = f"Summarize the purpose of this code:\n```
-{content}
-```"
+                prompt = f"""Summarize the purpose of this code:\n```
+                            {content}"""
                 response = openai.ChatCompletion.create(
                     model="gpt-4o-mini",
                     messages=[{"role":"user", "content": prompt}],
